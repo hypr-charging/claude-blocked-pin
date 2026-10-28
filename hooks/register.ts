@@ -8,7 +8,6 @@ const ASKS_PERSON = new Set(['AskUserQuestion', 'ExitPlanMode'])
 type Session = {
   sessionId: string
   group?: { id: string } | null
-  pinned?: boolean
 }
 
 function textOf(result: McpToolResult): string {
@@ -46,23 +45,18 @@ async function sectionId($: EngineInterface): Promise<string> {
 const keyOf = (session: Session) => `blocked:${session.sessionId}`
 
 async function block($: EngineInterface, reason: Blocked['reason']) {
-  const session = await self($)
+  let session = await self($)
   if ((await $.store.get(keyOf(session))) !== undefined) return
 
-  // Without a reported group there is nowhere known to put it back, so pin only.
-  const isGroupKnown = 'group' in session
-  const record: Blocked = {
-    reason,
-    group: isGroupKnown ? session.group?.id ?? null : undefined,
-    wasPinned: session.pinned === true,
+  // The app leaves `group` out until its window has reported the sidebar; give it a few seconds.
+  for (let tries = 0; !('group' in session) && tries < 5; tries++) {
+    await $.clock.sleep(1000)
+    session = await self($)
   }
-  await $.store.set(keyOf(session), record)
+  if (!('group' in session)) throw new Error(`the app has not reported this session's section, so it was not moved`)
 
-  // Moving into a group unpins, so file it first and pin after.
-  if (isGroupKnown) {
-    await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: await sectionId($) })
-  }
-  await call($, 'ccd_sidebar', 'set_pinned', { session_id: 'self', pinned: true })
+  await $.store.set(keyOf(session), { reason, group: session.group?.id ?? null } satisfies Blocked)
+  await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: await sectionId($) })
   $.ui.status(`BLOCKED: waiting on your ${reason === 'permission' ? 'approval' : 'answer'}`)
 }
 
@@ -71,15 +65,12 @@ async function unblock($: EngineInterface, onlyReason?: Blocked['reason']) {
   const was = (await $.store.get(keyOf(session))) as Blocked | undefined
   if (!was || (onlyReason && was.reason !== onlyReason)) return
 
-  if (was.group !== undefined) {
-    try {
-      await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: was.group ?? 'sessions' })
-    } catch {
-      // Its old section is gone: fall back to Ungrouped rather than staying in BLOCKED.
-      await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: 'sessions' })
-    }
+  try {
+    await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: was.group ?? 'sessions' })
+  } catch {
+    // Its old section is gone: fall back to Ungrouped rather than staying in BLOCKED.
+    await call($, 'ccd_sidebar', 'move_sessions', { session_ids: ['self'], section_id: 'sessions' })
   }
-  await call($, 'ccd_sidebar', 'set_pinned', { session_id: 'self', pinned: was.wasPinned })
   await $.store.delete(keyOf(session))
   $.ui.status(undefined)
 }

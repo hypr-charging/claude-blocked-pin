@@ -1,6 +1,6 @@
 {
   "name": "blocked-pin",
-  "version": "0.1.0",
-  "description": "Pins a session and files it under a BLOCKED sidebar section while it waits on you; puts it back when you reply.",
+  "version": "0.2.0",
+  "description": "Files a session under a BLOCKED sidebar section while it waits on you; puts it back when you reply.",
   "author": { "name": "hypr-charging" }
 }

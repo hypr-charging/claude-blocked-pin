@@ -1,7 +1,5 @@
-// Why the session is waiting on the person, and where it sat in the sidebar before.
-// `group` is undefined when the app had not reported groups yet, so the session was only pinned.
+// Why the session is waiting on the person, and the sidebar section it sat in before (null: Ungrouped).
 export type Blocked = {
   reason: 'permission' | 'question' | 'handback'
-  group: string | null | undefined
-  wasPinned: boolean
+  group: string | null
 }
