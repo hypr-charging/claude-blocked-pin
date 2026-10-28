@@ -1,0 +1,5 @@
+{
+  "name": "claude-blocked-pin",
+  "owner": { "name": "hypr-charging" },
+  "plugins": [{ "name": "blocked-pin", "source": "./" }]
+}
